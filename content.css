@@ -1,0 +1,221 @@
+.highlight-share-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+}
+
+.highlight-share-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+  width: 600px;
+  max-width: 90vw;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+/* 默认风格 */
+.highlight-share-card[data-style="1"] {
+  background: white;
+  color: #333;
+}
+
+/* 暗色风格 */
+.highlight-share-card[data-style="2"] {
+  background: #2c2c2c;
+  color: #fff;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.favicon {
+  width: 32px;
+  height: 32px;
+  margin-right: 12px;
+}
+
+.page-info {
+  flex: 1;
+}
+
+.page-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.page-url {
+  font-size: 14px;
+  color: #666;
+  word-break: break-all;
+}
+
+.card-content {
+  margin: 16px 0;
+}
+
+.selected-text {
+  font-size: 16px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.selected-text p {
+  margin: 0 0 1em;
+}
+
+.selected-text p:last-child {
+  margin-bottom: 0;
+}
+
+.selected-image {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+.card-toolbar {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.card-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #007AFF;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.card-toolbar button svg {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  vertical-align: middle;
+  transition: transform 0.2s ease;
+}
+
+.card-toolbar button:hover {
+  background: #0056b3;
+}
+
+.card-toolbar button:hover svg {
+  transform: scale(1.1);
+}
+
+.close-modal {
+  background: #666 !important;
+}
+
+.close-modal:hover {
+  background: #444 !important;
+}
+
+/* 右键菜单样式 */
+.card-context-menu {
+  position: fixed;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 8px 0;
+  z-index: 1000000;
+  min-width: 160px;
+}
+
+.card-context-menu .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 14px;
+  color: #333;
+}
+
+.card-context-menu .menu-item:hover {
+  background-color: #f5f5f5;
+}
+
+.card-context-menu .menu-item svg {
+  transition: transform 0.2s ease;
+}
+
+.card-context-menu .menu-item:hover svg {
+  transform: scale(1.1);
+}
+
+/* 提示框样式 */
+.highlight-share-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-size: 14px;
+  z-index: 1000000;
+  transition: transform 0.3s ease-out;
+}
+
+.highlight-share-toast.show {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* 暗色主题样式优化 */
+.highlight-share-card[data-style="2"] .page-url {
+  color: #999;
+}
+
+.highlight-share-card[data-style="2"] .card-context-menu {
+  background: #2c2c2c;
+  border: 1px solid #444;
+}
+
+.highlight-share-card[data-style="2"] .card-context-menu .menu-item {
+  color: #fff;
+}
+
+.highlight-share-card[data-style="2"] .card-context-menu .menu-item:hover {
+  background-color: #3c3c3c;
+}
+
+.highlight-share-card[data-style="2"] .card-toolbar button {
+  background: #444;
+}
+
+.highlight-share-card[data-style="2"] .card-toolbar button:hover {
+  background: #555;
+}
+
+.highlight-share-card[data-style="2"] .close-modal {
+  background: #333 !important;
+}
+
+.highlight-share-card[data-style="2"] .close-modal:hover {
+  background: #222 !important;
+}
