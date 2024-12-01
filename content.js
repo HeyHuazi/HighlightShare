@@ -15,7 +15,7 @@ function createShareCard(data) {
   cardModal = document.createElement('div');
   cardModal.className = 'highlight-share-modal';
   
-  // 创建卡片容器
+  // 创建卡片
   const card = document.createElement('div');
   card.className = 'highlight-share-card';
   card.setAttribute('data-style', '1');
@@ -41,6 +41,9 @@ function createShareCard(data) {
       ${formattedText ? `<div class="selected-text">${formattedText}</div>` : ''}
       ${data.imageUrl ? `<img src="${data.imageUrl}" class="selected-image" alt="selected image" crossorigin="anonymous">` : ''}
     </div>
+    <div class="card-footer">
+      <div class="qrcode-container" style="display: none;"></div>
+    </div>
   `;
 
   // 创建工具栏
@@ -53,6 +56,16 @@ function createShareCard(data) {
         <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
       </svg>
       切换
+    </button>
+    <button class="qrcode-toggle">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <rect x="7" y="7" width="3" height="3"/>
+        <rect x="14" y="7" width="3" height="3"/>
+        <rect x="7" y="14" width="3" height="3"/>
+        <rect x="14" y="14" width="3" height="3"/>
+      </svg>
+      二维码
     </button>
     <button class="copy-card">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -78,14 +91,52 @@ function createShareCard(data) {
     </button>
   `;
 
+  // 将卡片和工具栏添加到模态框
+  cardModal.appendChild(card);
+  cardModal.appendChild(toolbar);
+  document.body.appendChild(cardModal);
+
   // 添加事件监听
-  toolbar.querySelector('.style-switch').addEventListener('click', switchStyle);
-  toolbar.querySelector('.download-card').addEventListener('click', () => downloadCard(card));
-  toolbar.querySelector('.copy-card').addEventListener('click', () => copyCard(card));
-  toolbar.querySelector('.close-modal').addEventListener('click', () => {
-    document.body.removeChild(cardModal);
-    cardModal = null;
+  const styleSwitch = toolbar.querySelector('.style-switch');
+  const qrcodeToggle = toolbar.querySelector('.qrcode-toggle');
+  const downloadBtn = toolbar.querySelector('.download-card');
+  const copyBtn = toolbar.querySelector('.copy-card');
+  const closeBtn = toolbar.querySelector('.close-modal');
+  const qrcodeContainer = card.querySelector('.qrcode-container'); // 从卡片中查找二维码容器
+
+  console.log('Found buttons:', {
+    styleSwitch: !!styleSwitch,
+    qrcodeToggle: !!qrcodeToggle,
+    downloadBtn: !!downloadBtn,
+    copyBtn: !!copyBtn,
+    closeBtn: !!closeBtn,
+    qrcodeContainer: !!qrcodeContainer
   });
+
+  if (styleSwitch) {
+    styleSwitch.addEventListener('click', () => switchStyle(card));
+  }
+
+  if (qrcodeToggle && qrcodeContainer) {
+    qrcodeToggle.addEventListener('click', () => toggleQRCode(card, qrcodeContainer));
+  } else {
+    console.error('QR code toggle button or container not found', {
+      toggle: !!qrcodeToggle,
+      container: !!qrcodeContainer
+    });
+  }
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => downloadCard(card));
+  }
+
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => copyCard(card));
+  }
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeModal);
+  }
 
   // 添加卡片右键菜单
   card.addEventListener('contextmenu', (e) => {
@@ -135,10 +186,6 @@ function createShareCard(data) {
     document.addEventListener('click', removeMenu);
   });
 
-  cardModal.appendChild(card);
-  cardModal.appendChild(toolbar);
-  document.body.appendChild(cardModal);
-
   // 预加载图片
   const images = card.querySelectorAll('img');
   Promise.all(Array.from(images).map(img => {
@@ -157,11 +204,80 @@ function createShareCard(data) {
   });
 }
 
-function switchStyle() {
-  const card = document.querySelector('.highlight-share-card');
-  const currentStyle = card.getAttribute('data-style') || '1';
+// 切换主题样式
+function switchStyle(cardElement) {
+  const currentStyle = cardElement.getAttribute('data-style') || '1';
   const nextStyle = currentStyle === '1' ? '2' : '1';
-  card.setAttribute('data-style', nextStyle);
+  cardElement.setAttribute('data-style', nextStyle);
+
+  // 如果二维码正在显示，更新二维码颜色
+  const qrcodeContainer = cardElement.querySelector('.qrcode-container');
+  const button = cardElement.querySelector('.qrcode-toggle');
+
+  if (!qrcodeContainer) {
+    console.error('QR code container not found');
+    return;
+  }
+
+  if (!button) {
+    console.error('QR code toggle button not found');
+    return;
+  }
+
+  if (qrcodeContainer.style.display === 'block') {
+    qrcodeContainer.innerHTML = '';
+    generateQRCode(cardElement, qrcodeContainer);
+  }
+}
+
+// 切换二维码显示/隐藏
+function toggleQRCode(cardElement, qrcodeContainer) {
+  console.log('toggleQRCode called');
+  const button = cardModal.querySelector('.qrcode-toggle');
+  
+  console.log('Found elements:', {
+    qrcodeContainer: !!qrcodeContainer,
+    button: !!button
+  });
+
+  if (!qrcodeContainer || !button) {
+    console.error('Required elements not found');
+    return;
+  }
+
+  if (qrcodeContainer.style.display === 'none') {
+    qrcodeContainer.style.display = 'block';
+    generateQRCode(cardElement, qrcodeContainer);
+    button.classList.add('active');
+  } else {
+    qrcodeContainer.style.display = 'none';
+    button.classList.remove('active');
+  }
+}
+
+// 生成二维码
+function generateQRCode(cardElement, qrcodeContainer) {
+  console.log('Generating QR code');
+  const isDarkTheme = cardElement.getAttribute('data-style') === '2';
+  
+  try {
+    // 清除旧的二维码
+    qrcodeContainer.innerHTML = '';
+    
+    // 创建新的二维码
+    const qrcode = new QRCode(qrcodeContainer, {
+      text: window.location.href,
+      width: 70,
+      height: 70,
+      colorDark: isDarkTheme ? "#FFFFFF" : "#000000",
+      colorLight: isDarkTheme ? "#000000" : "#FFFFFF",
+      correctLevel: QRCode.CorrectLevel.H
+    });
+    
+    console.log('QR code generated successfully');
+  } catch (error) {
+    console.error('Failed to generate QR code:', error);
+  }
 }
 
 async function downloadCard(cardElement) {
@@ -356,6 +472,15 @@ function showToast(message) {
       }, 300);
     }, 2000);
   }, 100);
+}
+
+// 关闭模态框
+function closeModal() {
+  console.log('Closing modal');
+  if (cardModal && document.body.contains(cardModal)) {
+    document.body.removeChild(cardModal);
+    cardModal = null;
+  }
 }
 
 // 动态加载html2canvas

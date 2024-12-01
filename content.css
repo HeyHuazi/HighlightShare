@@ -219,3 +219,45 @@
 .highlight-share-card[data-style="2"] .close-modal:hover {
   background: #222 !important;
 }
+
+/* 卡片底部样式 */
+.card-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 16px;
+  /* border-top: 1px solid #eee; */
+}
+
+.highlight-share-card[data-style="2"] .card-footer {
+  border-top-color: #444;
+}
+
+/* 二维码容器样式 */
+.qrcode-container {
+  display: none;
+  margin-left: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.qrcode-container.show {
+  display: block;
+}
+
+.qrcode-container canvas {
+  display: block;
+  width: 40px !important;
+  height: 40px !important;
+}
+
+/* 二维码按钮激活状态 */
+.qrcode-toggle.active {
+  background: #005299 !important;
+  color: #fff !important;
+}
+
+/* 适配深色主题 */
+.highlight-share-card[data-style="2"] .qrcode-container {
+  background: #2c2c2c;
+}

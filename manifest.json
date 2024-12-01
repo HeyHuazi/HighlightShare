@@ -34,7 +34,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["html2canvas.min.js", "content.js"],
+      "js": ["html2canvas.min.js", "content.js","qrcode.min.js"],
       "css": ["content.css"]
     }
   ]
