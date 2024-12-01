@@ -1,10 +1,7 @@
 # HighlightShare Chrome Extension
 
 一个简单优雅的 Chrome 扩展，用于将网页中选中的文字和图片生成精美的分享卡片。
-<div>
- <video controls src="https://huazispace.s3.bitiful.net/HightlightShare/Preview.mp4" muted="false">
- </video>
-</div>
+![Demo](https://huazispace.s3.bitiful.net/HightlightShare/demo.jpeg)
 
 ## 功能特点
 
