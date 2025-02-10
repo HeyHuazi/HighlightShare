@@ -485,5 +485,5 @@ function closeModal() {
 
 // 动态加载html2canvas
 const script = document.createElement('script');
-script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
+script.src = '/html2canvas.min.js';
 document.head.appendChild(script);
