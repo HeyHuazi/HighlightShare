@@ -351,6 +351,11 @@ async function downloadCard(cardElement) {
       }
     }
     
+    // 放开高度限制：预览时限高 80vh 出滚动条，导出图片需要完整内容
+    clonedCard.style.height = 'auto';
+    clonedCard.style.maxHeight = 'none';
+    clonedCard.style.overflow = 'visible';
+
     container.appendChild(clonedCard);
     document.body.appendChild(container);
 
@@ -360,8 +365,6 @@ async function downloadCard(cardElement) {
       backgroundColor: isDarkMode ? '#2c2c2c' : '#ffffff',
       scale: 2,
       logging: false,
-      width: cardElement.offsetWidth,
-      height: cardElement.offsetHeight,
       removeContainer: true,
       foreignObjectRendering: false
     };
@@ -428,6 +431,11 @@ async function copyCard(cardElement) {
       }
     }
     
+    // 放开高度限制：预览时限高 80vh 出滚动条，导出图片需要完整内容
+    clonedCard.style.height = 'auto';
+    clonedCard.style.maxHeight = 'none';
+    clonedCard.style.overflow = 'visible';
+
     container.appendChild(clonedCard);
     document.body.appendChild(container);
 
@@ -437,8 +445,6 @@ async function copyCard(cardElement) {
       backgroundColor: isDarkMode ? '#2c2c2c' : '#ffffff',
       scale: 2,
       logging: false,
-      width: cardElement.offsetWidth,
-      height: cardElement.offsetHeight,
       removeContainer: true,
       foreignObjectRendering: false
     };
@@ -622,6 +628,31 @@ function wrapTopLevelInline(fragment) {
   }
 }
 
+// 规整片段间距：页面自带的大块间距在卡片里就是突兀的空白。
+// 首尾清零（间距交给卡片自身控制），中间过大的上下间距压到阈值；
+// 左右间距（列表缩进等）与负边距保持原样
+const MAX_BLOCK_GAP_PX = 24;
+
+function normalizeSpacing(fragment) {
+  const first = fragment.firstElementChild;
+  if (first) {
+    first.style.setProperty('margin-top', '0');
+  }
+  const last = fragment.lastElementChild;
+  if (last) {
+    last.style.setProperty('margin-bottom', '0');
+  }
+
+  fragment.querySelectorAll('*').forEach((el) => {
+    for (const side of ['top', 'bottom']) {
+      const value = parseFloat(el.style.getPropertyValue(`margin-${side}`));
+      if (value > MAX_BLOCK_GAP_PX) {
+        el.style.setProperty(`margin-${side}`, `${MAX_BLOCK_GAP_PX}px`);
+      }
+    }
+  });
+}
+
 // 捕获当前选区，返回保留格式的 DocumentFragment；失败返回 null（走纯文本兜底）
 function captureSelectionFragment() {
   try {
@@ -676,6 +707,7 @@ function doCaptureSelectionFragment() {
 
   sanitizeFragment(fragment);
   wrapTopLevelInline(fragment);
+  normalizeSpacing(fragment);
   return fragment;
 }
 
