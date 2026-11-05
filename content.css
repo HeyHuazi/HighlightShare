@@ -48,12 +48,17 @@
 
 .page-info {
   flex: 1;
+  /* 防止超长标题把 flex 子项撑开，保证标题能在自身宽度内截断 */
+  min-width: 0;
 }
 
 .page-title {
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 2px;
+  /* 预览兜底：标题只显示一行（导出图片的省略号由 JS 截断保证） */
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .page-url {

@@ -124,6 +124,9 @@ function createShareCard(data) {
   cardModal.appendChild(toolbar);
   document.body.appendChild(cardModal);
 
+  // 标题限一行：超长标题截断并补省略号（html2canvas 不支持 CSS 省略号，需在文字层面处理）
+  truncateTitleToOneLine(card.querySelector('.page-title'));
+
   // 添加事件监听
   const styleSwitch = toolbar.querySelector('.style-switch');
   const qrcodeToggle = toolbar.querySelector('.qrcode-toggle');
@@ -230,6 +233,31 @@ function createShareCard(data) {
     card.style.maxHeight = '80vh';
     card.style.overflow = 'auto';
   });
+}
+
+// 标题限一行：标题超出一行宽度时逐字截短并补省略号。
+// 用 canvas measureText 按实际字体测量宽度，兼容中英文混排；按码点截断避免切坏 emoji。
+function truncateTitleToOneLine(titleEl) {
+  if (!titleEl) return;
+
+  const fullText = titleEl.textContent;
+  const maxWidth = titleEl.clientWidth;
+  if (!fullText || !maxWidth) return;
+
+  const ctx = document.createElement('canvas').getContext('2d');
+  if (!ctx) return;
+
+  const style = window.getComputedStyle(titleEl);
+  ctx.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+
+  // 没超宽就不动标题
+  if (ctx.measureText(fullText).width <= maxWidth) return;
+
+  const chars = Array.from(fullText);
+  while (chars.length > 1 && ctx.measureText(chars.join('') + '…').width > maxWidth) {
+    chars.pop();
+  }
+  titleEl.textContent = chars.join('').trimEnd() + '…';
 }
 
 // 切换主题样式
