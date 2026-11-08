@@ -1,5 +1,19 @@
 let cardModal = null;
 
+// 缓存最近一次非折叠选区：右键操作可能让实时选区折叠，此时用缓存兜底
+let lastSelectionRange = null;
+
+document.addEventListener('selectionchange', () => {
+  try {
+    const sel = window.getSelection();
+    if (sel.rangeCount > 0 && !sel.isCollapsed) {
+      lastSelectionRange = sel.getRangeAt(0);
+    }
+  } catch (error) {
+    // 忽略异常的选区状态
+  }
+});
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "createCard") {
     createShareCard(request);
@@ -25,10 +39,10 @@ function createShareCard(data) {
   const pageUrl = window.location.href;
   const favicon = document.querySelector('link[rel*="icon"]')?.href || '/favicon.ico';
 
-  // 处理选中的文本，保留段落格式
+  // 处理选中的文本，保留段落格式（纯文本兜底路径）
   const formattedText = data.selection ? formatSelectedText(data.selection) : '';
 
-  // 构建卡片内容
+  // 构建卡片内容（选中内容稍后以 DOM 方式插入，避免字符串拼接破坏富文本结构）
   card.innerHTML = `
     <div class="card-header">
       <img src="${favicon}" class="favicon" alt="favicon" crossorigin="anonymous">
@@ -38,13 +52,27 @@ function createShareCard(data) {
       </div>
     </div>
     <div class="card-content">
-      ${formattedText ? `<div class="selected-text">${formattedText}</div>` : ''}
       ${data.imageUrl ? `<img src="${data.imageUrl}" class="selected-image" alt="selected image" crossorigin="anonymous">` : ''}
     </div>
     <div class="card-footer">
       <div class="qrcode-container" style="display: none;"></div>
     </div>
   `;
+
+  // 插入选中内容：优先富文本片段（保留浏览器中的结构与缩进），失败时回退纯文本
+  const cardContent = card.querySelector('.card-content');
+  const selectionFragment = captureSelectionFragment();
+  if (selectionFragment) {
+    const textDiv = document.createElement('div');
+    textDiv.className = 'selected-text';
+    textDiv.appendChild(selectionFragment);
+    cardContent.insertBefore(textDiv, cardContent.firstChild);
+  } else if (formattedText) {
+    const textDiv = document.createElement('div');
+    textDiv.className = 'selected-text';
+    textDiv.innerHTML = formattedText;
+    cardContent.insertBefore(textDiv, cardContent.firstChild);
+  }
 
   // 创建工具栏
   const toolbar = document.createElement('div');
@@ -95,6 +123,9 @@ function createShareCard(data) {
   cardModal.appendChild(card);
   cardModal.appendChild(toolbar);
   document.body.appendChild(cardModal);
+
+  // 标题限一行：超长标题截断并补省略号（html2canvas 不支持 CSS 省略号，需在文字层面处理）
+  truncateTitleToOneLine(card.querySelector('.page-title'));
 
   // 添加事件监听
   const styleSwitch = toolbar.querySelector('.style-switch');
@@ -202,6 +233,31 @@ function createShareCard(data) {
     card.style.maxHeight = '80vh';
     card.style.overflow = 'auto';
   });
+}
+
+// 标题限一行：标题超出一行宽度时逐字截短并补省略号。
+// 用 canvas measureText 按实际字体测量宽度，兼容中英文混排；按码点截断避免切坏 emoji。
+function truncateTitleToOneLine(titleEl) {
+  if (!titleEl) return;
+
+  const fullText = titleEl.textContent;
+  const maxWidth = titleEl.clientWidth;
+  if (!fullText || !maxWidth) return;
+
+  const ctx = document.createElement('canvas').getContext('2d');
+  if (!ctx) return;
+
+  const style = window.getComputedStyle(titleEl);
+  ctx.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+
+  // 没超宽就不动标题
+  if (ctx.measureText(fullText).width <= maxWidth) return;
+
+  const chars = Array.from(fullText);
+  while (chars.length > 1 && ctx.measureText(chars.join('') + '…').width > maxWidth) {
+    chars.pop();
+  }
+  titleEl.textContent = chars.join('').trimEnd() + '…';
 }
 
 // 切换主题样式
@@ -323,6 +379,11 @@ async function downloadCard(cardElement) {
       }
     }
     
+    // 放开高度限制：预览时限高 80vh 出滚动条，导出图片需要完整内容
+    clonedCard.style.height = 'auto';
+    clonedCard.style.maxHeight = 'none';
+    clonedCard.style.overflow = 'visible';
+
     container.appendChild(clonedCard);
     document.body.appendChild(container);
 
@@ -332,8 +393,6 @@ async function downloadCard(cardElement) {
       backgroundColor: isDarkMode ? '#2c2c2c' : '#ffffff',
       scale: 2,
       logging: false,
-      width: cardElement.offsetWidth,
-      height: cardElement.offsetHeight,
       removeContainer: true,
       foreignObjectRendering: false
     };
@@ -400,6 +459,11 @@ async function copyCard(cardElement) {
       }
     }
     
+    // 放开高度限制：预览时限高 80vh 出滚动条，导出图片需要完整内容
+    clonedCard.style.height = 'auto';
+    clonedCard.style.maxHeight = 'none';
+    clonedCard.style.overflow = 'visible';
+
     container.appendChild(clonedCard);
     document.body.appendChild(container);
 
@@ -409,8 +473,6 @@ async function copyCard(cardElement) {
       backgroundColor: isDarkMode ? '#2c2c2c' : '#ffffff',
       scale: 2,
       logging: false,
-      width: cardElement.offsetWidth,
-      height: cardElement.offsetHeight,
       removeContainer: true,
       foreignObjectRendering: false
     };
@@ -455,6 +517,226 @@ function formatSelectedText(text) {
     })
     .filter(p => p.length > 0)
     .join('');
+}
+
+// ============ 选区富文本捕获（保留浏览器中的结构与缩进） ============
+
+// 通用内联复制：缩进与排版相关（列表缩进/首行缩进/块级间距等）
+const COMMON_STYLE_PROPS = [
+  'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+  'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+  'text-indent', 'text-align', 'list-style-type', 'list-style-position'
+];
+
+function borderStyleProps() {
+  const props = ['border-radius'];
+  for (const side of ['top', 'right', 'bottom', 'left']) {
+    props.push(`border-${side}-width`, `border-${side}-style`, `border-${side}-color`);
+  }
+  return props;
+}
+
+// 特定标签额外复制：保留语义外观（代码块/引用/表格/链接/标题），正文颜色字号仍跟随卡片主题
+const TAG_STYLE_PROPS = {
+  PRE: ['font-family', 'font-size', 'background-color', 'border-radius'],
+  CODE: ['font-family', 'font-size', 'background-color', 'border-radius'],
+  BLOCKQUOTE: borderStyleProps(),
+  TABLE: ['border-collapse'],
+  TD: borderStyleProps(),
+  TH: borderStyleProps(),
+  A: ['color', 'text-decoration'],
+  H1: ['font-size', 'font-weight'],
+  H2: ['font-size', 'font-weight'],
+  H3: ['font-size', 'font-weight'],
+  H4: ['font-size', 'font-weight'],
+  H5: ['font-size', 'font-weight'],
+  H6: ['font-size', 'font-weight'],
+  DEL: ['text-decoration'],
+  INS: ['text-decoration'],
+  S: ['text-decoration'],
+  U: ['text-decoration']
+};
+
+// 块级标签集合：卡片顶层按块分组，散落的文本/行内元素包进 <p>
+const BLOCK_TAGS = new Set([
+  'P', 'DIV', 'UL', 'OL', 'LI', 'DL', 'DT', 'DD', 'BLOCKQUOTE', 'PRE',
+  'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TD', 'TH', 'CAPTION',
+  'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'HR', 'FIGURE', 'FIGCAPTION',
+  'SECTION', 'ARTICLE', 'ASIDE', 'HEADER', 'FOOTER', 'MAIN', 'NAV',
+  'DETAILS', 'SUMMARY', 'FIELDSET', 'ADDRESS'
+]);
+
+// 卡片内禁止出现的标签（无法渲染或存在风险），直接剔除
+const STRIP_TAGS_SELECTOR = 'script, iframe, object, embed, link, meta, style, base, template, '
+  + 'noscript, audio, video, canvas, svg, button, input, select, textarea, map, area, dialog, slot';
+
+// 获取当前可用的选区 Range：实时选区优先，其次 selectionchange 缓存
+function getActiveRange() {
+  try {
+    const sel = window.getSelection();
+    if (sel.rangeCount > 0 && !sel.isCollapsed) {
+      return sel.getRangeAt(0);
+    }
+  } catch (error) {
+    // 继续尝试缓存
+  }
+  if (lastSelectionRange) {
+    try {
+      if (lastSelectionRange.startContainer.isConnected
+        && lastSelectionRange.endContainer.isConnected) {
+        return lastSelectionRange;
+      }
+    } catch (error) {
+      // 缓存已失效
+    }
+  }
+  return null;
+}
+
+// 把元素上与"结构/缩进/语义外观"相关的计算样式写成内联样式，
+// 这样 range.cloneContents() 克隆时样式会随节点一起带走
+function applyInlineStyles(el) {
+  const computed = window.getComputedStyle(el);
+  const props = COMMON_STYLE_PROPS.concat(TAG_STYLE_PROPS[el.tagName] || []);
+  for (const prop of props) {
+    const value = computed.getPropertyValue(prop);
+    if (value) {
+      el.style.setProperty(prop, value);
+    }
+  }
+  // 代码块统一自动换行：保留空格缩进的同时避免长代码撑破卡片
+  if (el.tagName === 'PRE' || el.tagName === 'CODE') {
+    el.style.setProperty('white-space', 'pre-wrap');
+    el.style.setProperty('word-break', 'break-word');
+  }
+}
+
+// 清洗克隆出来的片段：去危险标签、事件属性、页面样式钩子，链接禁用跳转
+function sanitizeFragment(fragment) {
+  fragment.querySelectorAll(STRIP_TAGS_SELECTOR).forEach((el) => el.remove());
+
+  fragment.querySelectorAll('*').forEach((el) => {
+    el.removeAttribute('id');
+    el.removeAttribute('class');
+    for (const attr of Array.from(el.attributes)) {
+      if (attr.name.toLowerCase().startsWith('on')) {
+        el.removeAttribute(attr.name);
+      }
+    }
+    if (el.tagName === 'A') {
+      // 只保留链接外观（颜色/下划线由内联样式或卡片样式提供），禁用跳转
+      el.removeAttribute('href');
+      el.removeAttribute('target');
+      el.removeAttribute('name');
+    }
+    if (el.tagName === 'IMG') {
+      // 以 CORS 模式加载，便于 html2canvas 绘制到画布
+      el.setAttribute('crossorigin', 'anonymous');
+      el.removeAttribute('srcset');
+      el.removeAttribute('sizes');
+      el.removeAttribute('loading');
+    }
+  });
+}
+
+// 顶层的行内节点/文本包进 <p>，避免与块级元素混排时布局散架
+function wrapTopLevelInline(fragment) {
+  let wrapper = null;
+  for (const node of Array.from(fragment.childNodes)) {
+    const isBlock = node.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has(node.nodeName);
+    if (isBlock) {
+      wrapper = null;
+      continue;
+    }
+    if (!wrapper) {
+      wrapper = document.createElement('p');
+      fragment.insertBefore(wrapper, node);
+    }
+    wrapper.appendChild(node);
+  }
+}
+
+// 规整片段间距：页面自带的大块间距在卡片里就是突兀的空白。
+// 首尾清零（间距交给卡片自身控制），中间过大的上下间距压到阈值；
+// 左右间距（列表缩进等）与负边距保持原样
+const MAX_BLOCK_GAP_PX = 24;
+
+function normalizeSpacing(fragment) {
+  const first = fragment.firstElementChild;
+  if (first) {
+    first.style.setProperty('margin-top', '0');
+  }
+  const last = fragment.lastElementChild;
+  if (last) {
+    last.style.setProperty('margin-bottom', '0');
+  }
+
+  fragment.querySelectorAll('*').forEach((el) => {
+    for (const side of ['top', 'bottom']) {
+      const value = parseFloat(el.style.getPropertyValue(`margin-${side}`));
+      if (value > MAX_BLOCK_GAP_PX) {
+        el.style.setProperty(`margin-${side}`, `${MAX_BLOCK_GAP_PX}px`);
+      }
+    }
+  });
+}
+
+// 捕获当前选区，返回保留格式的 DocumentFragment；失败返回 null（走纯文本兜底）
+function captureSelectionFragment() {
+  try {
+    return doCaptureSelectionFragment();
+  } catch (error) {
+    console.warn('HighlightShare: 富文本选区捕获失败，回退纯文本', error);
+    return null;
+  }
+}
+
+function doCaptureSelectionFragment() {
+  const range = getActiveRange();
+  if (!range) return null;
+
+  const common = range.commonAncestorContainer;
+  const root = common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement;
+  if (!root) return null;
+
+  // 收集与选区相交的元素（按文档序），稍后给它们临时写入内联样式
+  const elements = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (node) => range.intersectsNode(node)
+      ? NodeFilter.FILTER_ACCEPT
+      : NodeFilter.FILTER_REJECT
+  });
+  let node;
+  while ((node = walker.nextNode())) {
+    elements.push(node);
+  }
+
+  // 临时写入内联样式 → 克隆 → 立刻还原页面原状（同步完成，页面不会感知到变化）
+  const savedStyles = [];
+  for (const el of elements) {
+    savedStyles.push([el, el.getAttribute('style')]);
+    applyInlineStyles(el);
+  }
+
+  let fragment = null;
+  try {
+    fragment = range.cloneContents();
+  } finally {
+    for (const [el, style] of savedStyles) {
+      if (style === null) {
+        el.removeAttribute('style');
+      } else {
+        el.setAttribute('style', style);
+      }
+    }
+  }
+
+  if (!fragment || !fragment.hasChildNodes()) return null;
+
+  sanitizeFragment(fragment);
+  wrapTopLevelInline(fragment);
+  normalizeSpacing(fragment);
+  return fragment;
 }
 
 function showToast(message) {

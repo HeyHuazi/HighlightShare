@@ -48,12 +48,17 @@
 
 .page-info {
   flex: 1;
+  /* 防止超长标题把 flex 子项撑开，保证标题能在自身宽度内截断 */
+  min-width: 0;
 }
 
 .page-title {
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 2px;
+  /* 预览兜底：标题只显示一行（导出图片的省略号由 JS 截断保证） */
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .page-url {
@@ -70,7 +75,8 @@
   font-size: 16px;
   line-height: 1.6;
   margin-bottom: 16px;
-  white-space: pre-wrap;
+  /* 富文本片段依赖 normal 合并源码中的空白，代码块的空白保留由其自身 white-space 控制 */
+  white-space: normal;
   word-wrap: break-word;
   word-break: break-word;
 }
@@ -260,4 +266,105 @@
 /* 适配深色主题 */
 .highlight-share-card[data-style="2"] .qrcode-container {
   background: #2c2c2c;
+}
+
+/* ===== 选区富文本渲染（页面自带样式的元素由内联样式覆盖，这里只是兜底默认值） ===== */
+
+.selected-text ul,
+.selected-text ol {
+  margin: 0.5em 0;
+  padding-left: 1.8em;
+}
+
+.selected-text li {
+  margin: 0.25em 0;
+}
+
+.selected-text blockquote {
+  margin: 0.75em 0;
+  padding: 8px 16px;
+  border-left: 3px solid #ddd;
+  color: #666;
+}
+
+.selected-text pre {
+  margin: 0.75em 0;
+  padding: 12px;
+  background: #f6f8fa;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.selected-text code {
+  font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.9em;
+  background: #f0f0f0;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.selected-text pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.selected-text table {
+  border-collapse: collapse;
+  margin: 0.75em 0;
+  max-width: 100%;
+}
+
+.selected-text th,
+.selected-text td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+}
+
+.selected-text hr {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 1em 0;
+}
+
+.selected-text a {
+  color: #007AFF;
+  text-decoration: underline;
+}
+
+.selected-text img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 暗色主题下的选区富文本兜底样式 */
+.highlight-share-card[data-style="2"] .selected-text blockquote {
+  border-left-color: #555;
+  color: #bbb;
+}
+
+.highlight-share-card[data-style="2"] .selected-text pre {
+  background: #1e1e1e;
+}
+
+.highlight-share-card[data-style="2"] .selected-text code {
+  background: #3a3a3a;
+}
+
+.highlight-share-card[data-style="2"] .selected-text a {
+  color: #4da3ff;
+}
+
+.highlight-share-card[data-style="2"] .selected-text th,
+.highlight-share-card[data-style="2"] .selected-text td {
+  border-color: #444;
+}
+
+.highlight-share-card[data-style="2"] .selected-text hr {
+  border-top-color: #444;
 }
